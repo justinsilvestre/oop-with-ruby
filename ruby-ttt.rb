@@ -1,7 +1,8 @@
 module TicTacToe
 
-	GridSize = 3
+	GridSize = 3 	
 	TotalPlayers = 2
+
 
 class Board
 	attr_accessor :side, :spaces
@@ -11,6 +12,20 @@ class Board
 		@side.times do
 			spaces << Array.new(side, ' ')
 		end
+	end
+	def display
+		@spaces.each_with_index do |row, i| 
+			display_row = row.join(' | ')
+			puts display_row
+			print "-" * (display_row.length) + "\n" unless i == side - 1
+		end
+	end
+	def full?
+		rows_full_status = @spaces.map{ |row| row.none? { |space| space == " " } }
+		rows_full_status.all? {|full| full == true }
+	end
+	def [](row)
+		@spaces[row]
 	end
 end
 
@@ -29,8 +44,9 @@ class Player
 end
 
 class Game
+
 	def initialize
-		@board = Board.new(GridSize).spaces
+		@board = Board.new(GridSize)
 		@players = []
 		TotalPlayers.times { @players << Player.new }
 		#turns started so far
@@ -41,128 +57,98 @@ class Game
 
 	def turn
 		@turns += 1
-		puts "Player #{current_player+1}'s turn."
-		update(take_coordinates)
+		puts "Player #{whose_turn+1}'s turn."
+		coordinates = take_coordinates
+		update(coordinates[0], coordinates[1])
 		return self
 	end
 
-	def update(coordinates)
-
-		row = coordinates[0]
-		column = coordinates[1]
-
-		char = @players[current_player].char
-		@board[row][column] = char
-
-		if in_a_row(coordinates) == GridSize
-			@won = true
-		end
-
+	def update(row, column)
+		@board[row-1][column-1] = @players[whose_turn].char
+		@won = true if in_a_row(row, column) == GridSize
 	end
 
-
-
-
-
-
 	def display
-		@board.each_with_index do |row, i| 
-			puts row.join('|')
-			print "-" * (GridSize * 2 - 1) + "\n" unless i == GridSize - 1
-		end
+		@board.display
+		self
 	end
 
 	def over?
 		if @won == true
-			puts "Congratulations, Player #{current_player+1}!"
+			puts "Congratulations, Player #{whose_turn+1}!"
 			puts "You won!"
 			return true
+		elsif @board.full?
+			puts "It's a draw!"
+			return true
 		else
-			rows_full_status = @board.map do |row|
-				row.none? { |space| space == " " }
-			end
-			all_full = rows_full_status.all? {|full| full == true }
-			if all_full
-				puts "It's a draw!"
-				return true
-			else
-				return false
-			end
+			return false
 		end
 	end
 
-	#private
+	private
 
-	def current_player
+	def whose_turn
 		(@turns-1) % TotalPlayers
 	end
 
 	def take_coordinates
-		puts "Enter row from 0 to #{GridSize-1}:"
-		row = valid_coordinate
-		puts "Enter column from 0 to #{GridSize-1}:"
-		column = valid_coordinate
-		if @board[row][column] == ' '
+		row = nil
+		column = nil
+		until row
+			puts "Enter row from 1 to #{GridSize}:"
+			row = valid_coordinate(gets.chomp)
+		end
+		until column
+			puts "Enter column from 1 to #{GridSize}:"
+			column = valid_coordinate(gets.chomp)
+		end
+		if @board[row-1][column-1] == ' '
 			return [row, column]
 		else
 			puts "Sorry, that space is taken."
 			take_coordinates
 		end
 	end
-	def valid_coordinate
-		input = gets.chomp
-		if input =~ /^+?[0-9]+$/ && input.to_i < GridSize
+
+	def valid_coordinate(input)
+		if input.to_s =~ /^+?[0-9]+$/ && input.to_i.between?(1,GridSize)
 			return input.to_i
 		else
-			puts "Sorry, please enter a number from 0 to #{GridSize-1}:"
-			valid_coordinate
+			return false
 		end
 	end
 
+	Orientations = [
+				{horizontal: 0, vertical: 1}, #up
+				{horizontal: 1, vertical: 0}, #right
+				{horizontal: 1, vertical: 1}, #up-right
+				{horizontal: -1, vertical: 1} #down-right
+			]
 
-	def in_a_row(coordinates)
-		home_row = coordinates[0]
-		home_column = coordinates[1]
+	def in_a_row(home_row, home_column)
+		output = 1
 		total = 1
-		total_one_way = 1
-
-		orientations = [
-			{horizontal: 0, vertical: 1}, #up
-			{horizontal: 1, vertical: 0}, #right
-			{horizontal: 1, vertical: 1}, #up-right
-			{horizontal: -1, vertical: 1} #bottom-right
-		]
-		orientation = 0
+		total_from_home = 1
 		direction = 1
-
-		while total < GridSize && orientation < 4
-			row_increment = orientations[orientation][:horizontal] * total_one_way * direction
-			column_increment = orientations[orientation][:vertical] * total_one_way * direction
-			if (home_row+row_increment).between?(0,GridSize-1) && (home_column+column_increment).between?(0,(GridSize-1))
-				current_coordinate = @board[home_row+row_increment][home_column+column_increment]
-				#puts "current coordinate : #{home_row+row_increment}, #{home_column+column_increment}"
+		Orientations.each do |orientation|
+			break if total == GridSize
+			step = total_from_home * direction
+			row = home_row + (orientation[:horizontal] * step)
+			column = home_column + (orientation[:vertical] * step)
+			if valid_coordinate(row) && valid_coordinate(column) && @board[row-1][column-1] == @players[whose_turn].char
+				total_from_home += 1
+				total += 1;
+				output = total > output ? total : output
+				redo
 			else
-				current_coordinate = nil
-				#puts "current coordinate : nillio"
-			end
-
-			if current_coordinate.nil? == false && current_coordinate == @players[current_player].char
-				#puts "match!"
-				total += 1
-				total_one_way += 1
-			elsif direction > 0
-				#puts "no match--going other way"
-				direction = -1
-				total_one_way = 1
-			else
-				#puts "no match--new orientation"
-				orientation += 1
-				direction = 1
-				total_one_way = 1
+				direction *= -1
+				total_from_home = 1
+				redo if direction > 0
 				total = 1
 			end
 		end
-		return total
+		output
 	end
 
 end

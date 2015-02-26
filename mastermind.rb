@@ -48,7 +48,6 @@ end
 class Board
 	def initialize(code_to_guess)
 		@code_to_guess = code_to_guess
-		puts @code_to_guess
 		@rows = []
 	end
 	def display 
